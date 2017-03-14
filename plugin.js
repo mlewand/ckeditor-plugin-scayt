@@ -65,6 +65,10 @@ CKEDITOR.plugins.add('scayt', {
 						that.setState(ev.data);
 					}
 				});
+				editor.on('scaytButtonNotify', function(ev) {
+					var elem = CKEDITOR.document.getById( that._.id );
+					elem.setStyle('background', ev.data ? '#FFA184' : '#fff' );
+				});
 			},
 			onMenu : function() {
 				var scaytInstance = editor.scayt;
@@ -1320,6 +1324,10 @@ CKEDITOR.plugins.scayt = {
 
 			scaytInstance.subscribe('graytStateChanged', function(data) {
 				plugin.state.grayt[_editor.name] = data.state;
+			});
+
+			scaytInstance.subscribe('freeze', function(event) {
+				_editor.fire('scaytButtonNotify', event.status);
 			});
 
 			// backward compatibility if version of scayt app < 4.8.3
