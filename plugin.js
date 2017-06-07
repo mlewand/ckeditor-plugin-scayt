@@ -18,6 +18,9 @@ CKEDITOR.plugins.add('scayt', {
 		if ( ( CKEDITOR.skinName || editor.config.skin ) == 'moono-lisa' ) {
 			CKEDITOR.document.appendStyleSheet( this.path + 'skins/' + CKEDITOR.skin.name + '/scayt.css' );
 		}
+		
+		// Append specific stylesheet for some dialog elements.
+		CKEDITOR.document.appendStyleSheet(this.path + 'dialogs/dialog.css');
 	},
 	init: function(editor) {
 		var self = this,
@@ -95,6 +98,13 @@ CKEDITOR.plugins.add('scayt', {
 
 				if(!editor.config.scayt_uiTabs[2]) {
 					delete menuDefinition.scaytDict;
+				}
+
+				// Backword compatibility for WebSpellChecker.net application before version v4.8.9
+				if(scaytInstance && !CKEDITOR.plugins.scayt.isNewUdSupported(scaytInstance)) {
+					delete menuDefinition.scaytDict;
+					editor.config.scayt_uiTabs[2] = 0;
+					CKEDITOR.plugins.scayt.alarmCompatibilityMessage();
 				}
 
 				return menuDefinition;
@@ -398,7 +408,7 @@ CKEDITOR.plugins.add('scayt', {
 
 		editor.on('beforeCommandExec', function(ev) {
 			var scaytInstance = editor.scayt,
-				selectedLangElement = null,
+				language = false,
 				forceBookmark = false,
 				removeMarkupInsideSelection = true;
 
@@ -419,11 +429,10 @@ CKEDITOR.plugins.add('scayt', {
 						forceBookmark = true;
 					}
 
-					// We need to remove all SCAYT markup from 'lang' node before it will be deleted.
-					// We need to remove SCAYT markup from selected text before creating 'lang' node as well.
 					if(ev.data.name === 'language') {
-						selectedLangElement = editor.plugins.language.getCurrentLangElement(editor);
-						selectedLangElement = selectedLangElement && selectedLangElement.$;
+						// We need pass 'language' as true into 'reloadMarkupScayt' listener
+						// for correct work SCAYT with CKEditor language plugin
+						language = true;
 						// We need to force bookmark before we remove our markup.
 						// Otherwise we will get issues with cutting text via language plugin menu.
 						forceBookmark = true;
@@ -433,7 +442,7 @@ CKEDITOR.plugins.add('scayt', {
 						removeOptions: {
 							removeInside: removeMarkupInsideSelection,
 							forceBookmark: forceBookmark,
-							selectionNode: selectedLangElement
+							language: language
 						},
 						timeout: 0
 					});
@@ -513,6 +522,7 @@ CKEDITOR.plugins.add('scayt', {
 		editor.on('reloadMarkupScayt', function(ev) {
 			var removeOptions = ev.data && ev.data.removeOptions,
 				timeout = ev.data && ev.data.timeout,
+				language = ev.data && ev.data.language,
 				scaytInstance = editor.scayt;
 
 			if (scaytInstance) {
@@ -521,6 +531,13 @@ CKEDITOR.plugins.add('scayt', {
 				 * asynchroniosly and keep CKEDITOR flow as expected
 				 */
 				setTimeout(function() {
+					// If we reload markup for 'language' command
+					// we need current lang element in selection
+					// for passing it into 'removeMarkupInSelectionNode' API method
+					if (language) {
+						removeOptions.selectionNode = editor.plugins.language.getCurrentLangElement(editor);
+						removeOptions.selectionNode = (removeOptions.selectionNode && removeOptions.selectionNode.$) || null;
+					}
 
 					/* trigger remove and reload markup */
 					scaytInstance.removeMarkupInSelectionNode(removeOptions);
@@ -536,10 +553,16 @@ CKEDITOR.plugins.add('scayt', {
 		}, this, null, 50);
 
 		editor.on('insertHtml', function() {
+			if(editor.scayt && editor.scayt.setFocused) {
+				editor.scayt.setFocused(true);
+			}
 			editor.fire('reloadMarkupScayt');
 		}, this, null, 50);
 
 		editor.on('insertText', function() {
+			if(editor.scayt && editor.scayt.setFocused) {
+				editor.scayt.setFocused(true);
+			}
 			editor.fire('reloadMarkupScayt');
 		}, this, null, 50);
 
@@ -644,6 +667,10 @@ CKEDITOR.plugins.add('scayt', {
 
 		if(typeof editor.config.scayt_customerId !== 'string') {
 			editor.config.scayt_customerId = '1:WvF0D4-UtPqN1-43nkD4-NKvUm2-daQqk3-LmNiI-z7Ysb4-mwry24-T8YrS3-Q2tpq2';
+		}
+
+		if(typeof editor.config.scayt_customPunctuation !== 'string') {
+			editor.config.scayt_customPunctuation = '-';
 		}
 
 		if(typeof editor.config.scayt_srcUrl !== 'string') {
@@ -1178,12 +1205,17 @@ CKEDITOR.plugins.scayt = {
 		'scayt_service_path'  : 'scayt_servicePath',
 		'scayt_customerid'    : 'scayt_customerId'
 	},
-	alarmCompatibilityMessage: function(){
-		if(this.warningCounter < 5){
-			console.warn('Note: You are using latest version of SCAYT plug-in. It is recommended to upgrade WebSpellChecker.net application to version v4.8.3.' +
-					'Contact us by e-mail at support@webspellchecker.net.');
+	alarmCompatibilityMessage: function() {
+		var message = 'You are using the latest version of SCAYT plugin for CKEditor with the old application version. In order to have access to the newest features, it is recommended to upgrade the application version to latest one as well. Contact us for more details at support@webspellchecker.net.';
+
+		if (this.warningCounter < 5) {
+			console.warn(message);
 			this.warningCounter += 1;
 		}
+	},
+	// Backward compatibility if version of WebSpellChecker.net application < 4.8.9
+	isNewUdSupported: function(scaytInstance) {
+		return scaytInstance.getUserDictionary ? true : false;
 	},
 	// backward compatibility if version of scayt app < 4.8.3
 	reloadMarkup: function(scaytInstance) {
@@ -1228,6 +1260,7 @@ CKEDITOR.plugins.scayt = {
 				userDictionaryName 	: _editor.config.scayt_userDictionaryName,
 				localization 		: _editor.langCode,
 				customer_id 		: _editor.config.scayt_customerId,
+				customPunctuation 	: _editor.config.scayt_customPunctuation,
 				debug 				: _editor.config.scayt_debug,
 				data_attribute_name : self.options.data_attribute_name,
 				misspelled_word_class: self.options.misspelled_word_class,
@@ -1236,6 +1269,7 @@ CKEDITOR.plugins.scayt = {
 				'options-to-restore':  _editor.config.scayt_disableOptionsStorage,
 				focused 			: _editor.editable().hasFocus, // #30260 we need to set focused=true if CKEditor is focused before SCAYT initialization
 				ignoreElementsRegex : _editor.config.scayt_elementsToIgnore,
+				ignoreGraytElementsRegex: _editor.config.grayt_elementsToIgnore,
 				minWordLength 		: _editor.config.scayt_minWordLength,
 				multiLanguageMode 	: _editor.config.scayt_multiLanguageMode,
 				multiLanguageStyles	: _editor.config.scayt_multiLanguageStyles,
@@ -1586,6 +1620,18 @@ CKEDITOR.on('scaytReady', function() {
  *		config.scayt_minWordLength = 5;
  *
  * @cfg {Number} [scayt_minWordLength=4]
+ * @member CKEDITOR.config
+ */
+
+/**
+ * The parameter that receives a string with characters that will considered as separators.
+ *
+ * Read more in the [documentation](#!/guide/dev_spellcheck) and see the [SDK sample](http://sdk.ckeditor.com/samples/spellchecker.html).
+ *
+ *		// additional separator.
+ *		config.scayt_customPunctuation  = '-';
+ *
+ * @cfg {String} [scayt_customPunctuation='']
  * @member CKEDITOR.config
  */
 
