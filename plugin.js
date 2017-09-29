@@ -18,7 +18,7 @@ CKEDITOR.plugins.add('scayt', {
 		if ( ( CKEDITOR.skinName || editor.config.skin ) == 'moono-lisa' ) {
 			CKEDITOR.document.appendStyleSheet( this.path + 'skins/' + CKEDITOR.skin.name + '/scayt.css' );
 		}
-		
+
 		// Append specific stylesheet for some dialog elements.
 		CKEDITOR.document.appendStyleSheet(this.path + 'dialogs/dialog.css');
 	},
@@ -571,58 +571,63 @@ CKEDITOR.plugins.add('scayt', {
 		});
 	},
 	parseConfig: function(editor) {
-		var plugin = CKEDITOR.plugins.scayt;
+		var isString = function(v) {return typeof v === 'string'},
+			config = editor.config,
+			plugin = CKEDITOR.plugins.scayt;
 
-		// preprocess config for backward compatibility
-		plugin.replaceOldOptionsNames(editor.config);
+		plugin.state.scayt[editor.name] = (typeof config.scayt_autoStartup === 'boolean') ? config.scayt_autoStartup : false;
+		plugin.state.grayt[editor.name] = (typeof config.grayt_autoStartup === 'boolean') ? config.scayt_autoStartup : false;
 
-		// Checking editor's config after initialization
-		if(typeof editor.config.scayt_autoStartup !== 'boolean') {
-			editor.config.scayt_autoStartup = false;
+		var template = {
+			scayt_contextCommands: {
+				defaultValue: 'ignoreall|add',
+				type: 'string'
+			},
+			scayt_contextMenuItemsOrder: {
+				defaultValue: 'suggest|moresuggest|control',
+				type: 'string'
+			},
+			scayt_moreSuggestions: {
+				defaultValue: 'on',
+				type: 'string'
+			},
+			scayt_inlineModeImmediateMarkup: {
+				defaultValue: false,
+				type: 'boolean'
+			},
+			scayt_srcUrl: {
+				defaultValue: (function() {
+					var protocol = document.location.protocol;
+					protocol = protocol.search(/https?:/) != -1 ? protocol : 'http:';
+
+					return protocol + '//svc.webspellchecker.net/spellcheck31/lf/scayt3/ckscayt/ckscayt.js';
+				})(),
+				type: 'string'
+			},
+			scayt_handleCheckDirty: {
+				defaultValue: true,
+				type: 'boolean'
+			},
+			scayt_handleUndoRedo: {
+				defaultValue: true,
+				type: 'boolean'
+			}
+		};
+		for(var itemName in template) {
+			var item = template[itemName];
+			if(typeof config[itemName] !== item.type) {
+				config[itemName] = item.defaultValue;
+			}
 		}
-		plugin.state.scayt[editor.name] = editor.config.scayt_autoStartup;
 
-		if(typeof editor.config.grayt_autoStartup !== 'boolean') {
-			editor.config.grayt_autoStartup = false;
-		}
-		if(typeof editor.config.scayt_inlineModeImmediateMarkup !== 'boolean') {
-			editor.config.scayt_inlineModeImmediateMarkup = false;
-		}
-		plugin.state.grayt[editor.name] = editor.config.grayt_autoStartup;
+		/* checking 'undo' plugin, if no disable SCAYT handler */
+		config.scayt_handleUndoRedo = CKEDITOR.plugins.undo ? config.scayt_handleUndoRedo : false;
 
-		if(!editor.config.scayt_contextCommands) {
-			editor.config.scayt_contextCommands = 'ignoreall|add';
-		}
-
-		if(!editor.config.scayt_contextMenuItemsOrder) {
-			editor.config.scayt_contextMenuItemsOrder = 'suggest|moresuggest|control';
-		}
-
-		if(!editor.config.scayt_sLang) {
-			editor.config.scayt_sLang = 'en_US';
-		}
-
-		if(editor.config.scayt_maxSuggestions === undefined || typeof editor.config.scayt_maxSuggestions != 'number' || editor.config.scayt_maxSuggestions < 0) {
-			editor.config.scayt_maxSuggestions = 5;
-		}
-
-		if(editor.config.scayt_minWordLength === undefined || typeof editor.config.scayt_minWordLength != 'number' || editor.config.scayt_minWordLength < 1) {
-			editor.config.scayt_minWordLength = 4;
-		}
-
-		if(editor.config.scayt_customDictionaryIds === undefined || typeof editor.config.scayt_customDictionaryIds !== 'string') {
-			editor.config.scayt_customDictionaryIds = '';
-		}
-
-		if(editor.config.scayt_userDictionaryName === undefined || typeof editor.config.scayt_userDictionaryName !== 'string') {
-			editor.config.scayt_userDictionaryName = null;
-		}
-
-		if(typeof editor.config.scayt_uiTabs === 'string' && editor.config.scayt_uiTabs.split(',').length === 3) {
+		if(typeof config.scayt_uiTabs === 'string' && config.scayt_uiTabs.split(',').length === 3) {
 			var scayt_uiTabs = [], _tempUITabs = [];
-			editor.config.scayt_uiTabs = editor.config.scayt_uiTabs.split(',');
+			config.scayt_uiTabs = config.scayt_uiTabs.split(',');
 
-			CKEDITOR.tools.search(editor.config.scayt_uiTabs, function(value) {
+			CKEDITOR.tools.search(config.scayt_uiTabs, function(value) {
 				if (Number(value) === 1 || Number(value) === 0) {
 					_tempUITabs.push(true);
 					scayt_uiTabs.push(Number(value));
@@ -632,126 +637,13 @@ CKEDITOR.plugins.add('scayt', {
 			});
 
 			if (CKEDITOR.tools.search(_tempUITabs, false) === null) {
-				editor.config.scayt_uiTabs = scayt_uiTabs;
+				config.scayt_uiTabs = scayt_uiTabs;
 			} else {
-				editor.config.scayt_uiTabs = [1,1,1];
+				config.scayt_uiTabs = [1,1,1];
 			}
 
 		} else {
-			editor.config.scayt_uiTabs = [1,1,1];
-		}
-
-		if(typeof editor.config.scayt_serviceProtocol != 'string') {
-			editor.config.scayt_serviceProtocol = null;
-		}
-
-		if(typeof editor.config.scayt_serviceHost != 'string') {
-			editor.config.scayt_serviceHost = null;
-		}
-
-		if(typeof editor.config.scayt_servicePort != 'string') {
-			editor.config.scayt_servicePort = null;
-		}
-
-		if(typeof editor.config.scayt_servicePath != 'string') {
-			editor.config.scayt_servicePath = null;
-		}
-
-		if(!editor.config.scayt_moreSuggestions) {
-			editor.config.scayt_moreSuggestions = 'on';
-		}
-
-		if(typeof editor.config.scayt_customerId !== 'string') {
-			editor.config.scayt_customerId = '1:WvF0D4-UtPqN1-43nkD4-NKvUm2-daQqk3-LmNiI-z7Ysb4-mwry24-T8YrS3-Q2tpq2';
-		}
-
-		if(typeof editor.config.scayt_customPunctuation !== 'string') {
-			editor.config.scayt_customPunctuation = '-';
-		}
-
-		if(typeof editor.config.scayt_srcUrl !== 'string') {
-			var protocol = document.location.protocol;
-			protocol = protocol.search(/https?:/) != -1 ? protocol : 'http:';
-
-			editor.config.scayt_srcUrl = protocol + '//svc.webspellchecker.net/spellcheck31/lf/scayt3/ckscayt/ckscayt.js';
-		}
-
-		if(typeof CKEDITOR.config.scayt_handleCheckDirty !== 'boolean') {
-			CKEDITOR.config.scayt_handleCheckDirty = true;
-		}
-
-		if(typeof CKEDITOR.config.scayt_handleUndoRedo !== 'boolean') {
-			/* set default as 'true' */
-			CKEDITOR.config.scayt_handleUndoRedo = true;
-		}
-		/* checking 'undo' plugin, if no disable SCAYT handler */
-		CKEDITOR.config.scayt_handleUndoRedo = CKEDITOR.plugins.undo ? CKEDITOR.config.scayt_handleUndoRedo : false;
-
-		if(typeof editor.config.scayt_multiLanguageMode !== 'boolean') {
-			editor.config.scayt_multiLanguageMode = false;
-		}
-
-		if(typeof editor.config.scayt_multiLanguageStyles !== 'object') {
-			editor.config.scayt_multiLanguageStyles = {};
-		}
-
-		if(editor.config.scayt_ignoreAllCapsWords && typeof editor.config.scayt_ignoreAllCapsWords !== 'boolean') {
-			editor.config.scayt_ignoreAllCapsWords = false;
-		}
-
-		if(editor.config.scayt_ignoreDomainNames && typeof editor.config.scayt_ignoreDomainNames !== 'boolean') {
-			editor.config.scayt_ignoreDomainNames = false;
-		}
-
-		if(editor.config.scayt_ignoreWordsWithMixedCases && typeof editor.config.scayt_ignoreWordsWithMixedCases !== 'boolean') {
-			editor.config.scayt_ignoreWordsWithMixedCases = false;
-		}
-
-		if(editor.config.scayt_ignoreWordsWithNumbers && typeof editor.config.scayt_ignoreWordsWithNumbers !== 'boolean') {
-			editor.config.scayt_ignoreWordsWithNumbers = false;
-		}
-
-		if( editor.config.scayt_disableOptionsStorage ) {
-			var userOptions = CKEDITOR.tools.isArray( editor.config.scayt_disableOptionsStorage ) ? editor.config.scayt_disableOptionsStorage : ( typeof editor.config.scayt_disableOptionsStorage === 'string' ) ? [ editor.config.scayt_disableOptionsStorage ] : undefined,
-				availableValue = [ 'all', 'options', 'lang', 'ignore-all-caps-words', 'ignore-domain-names', 'ignore-words-with-mixed-cases', 'ignore-words-with-numbers'],
-				valuesOption = ['lang', 'ignore-all-caps-words', 'ignore-domain-names', 'ignore-words-with-mixed-cases', 'ignore-words-with-numbers'],
-				search = CKEDITOR.tools.search,
-				indexOf = CKEDITOR.tools.indexOf;
-
-			var isValidOption = function( option ) {
-				return !!search( availableValue, option );
-			};
-
-			var makeOptionsToStorage = function( options ) {
-				var retval = [];
-
-				for (var i = 0; i < options.length; i++) {
-					var value = options[i],
-						isGroupOptionInUserOptions = !!search( options, 'options' );
-
-					if( !isValidOption( value ) || isGroupOptionInUserOptions && !!search( valuesOption, function( val ) { if( val === 'lang' ) { return false; } } ) ) {
-						return;
-					}
-
-					if( !!search( valuesOption, value ) ) {
-						valuesOption.splice( indexOf( valuesOption, value ), 1 );
-					}
-
-					if(  value === 'all' || isGroupOptionInUserOptions && !!search( options, 'lang' )) {
-						return [];
-					}
-
-					if( value === 'options' ) {
-						valuesOption = [ 'lang' ];
-					}
-				}
-
-				retval = retval.concat( valuesOption );
-
-				return retval;
-			};
-
-			editor.config.scayt_disableOptionsStorage = makeOptionsToStorage( userOptions );
+			config.scayt_uiTabs = [1,1,1];
 		}
 	},
 	addRule: function(editor) {
@@ -1202,11 +1094,7 @@ CKEDITOR.plugins.scayt = {
 			source: true,
 			newpage: true,
 			templates: true
-		},
-		data_attribute_name: 'data-scayt-word',
-		misspelled_word_class: 'scayt-misspell-word',
-		problem_grammar_data_attribute: 'data-grayt-phrase',
-		problem_grammar_class: 'gramm-problem'
+		}
 	},
 	backCompatibilityMap: {
 		'scayt_service_protocol': 'scayt_serviceProtocol',
@@ -1262,66 +1150,68 @@ CKEDITOR.plugins.scayt = {
 				plugin.state.scayt[_editor.name] = false;
 				return;
 			}
+			// Now we use OptionsManager for validate options.
+			// This module can import option templates if some option processed in another place.
+			var OptionsManager = WEBSPELLCHECKER.OptionsManager,
+				optionTypes = OptionsManager.optionTypes,
+				AppTemplate = OptionsManager.getOptionsTemplate('AppTemplate'),
+				optionsTemplate,
+				plugin = CKEDITOR.plugins.scayt,
+				config = editor.config,
+				criticalMessage = '',
+				textContainer = editor.window && editor.window.getFrame() || editor.editable(),
+				appInstanceOptions = {};
 
-			var scaytInstanceOptions = {
-				lang 				: _editor.config.scayt_sLang,
+			plugin.replaceOldOptionsNames(config);
+			AppTemplate.setDefaults({
+				customerId: '1:WvF0D4-UtPqN1-43nkD4-NKvUm2-daQqk3-LmNiI-z7Ysb4-mwry24-T8YrS3-Q2tpq2',
+				appType: 'CKEditor'
+
+			});
+			OptionsManager.addOptionsTemplate('CKEditorAppTemplate', AppTemplate);
+
+			var optionsMap = {
+				autoStartup			: config.scayt_autoStartup,
+				lang 				: config.scayt_sLang,
 				container 			: textContainer.$,
-				customDictionary 	: _editor.config.scayt_customDictionaryIds,
-				userDictionaryName 	: _editor.config.scayt_userDictionaryName,
-				localization 		: _editor.langCode,
-				customer_id 		: _editor.config.scayt_customerId,
-				customPunctuation 	: _editor.config.scayt_customPunctuation,
-				debug 				: _editor.config.scayt_debug,
-				data_attribute_name : self.options.data_attribute_name,
-				misspelled_word_class: self.options.misspelled_word_class,
-				problem_grammar_data_attribute: self.options.problem_grammar_data_attribute,
-				problem_grammar_class: self.options.problem_grammar_class,
-				'options-to-restore':  _editor.config.scayt_disableOptionsStorage,
-				focused 			: _editor.editable().hasFocus, // #30260 we need to set focused=true if CKEditor is focused before SCAYT initialization
-				ignoreElementsRegex : _editor.config.scayt_elementsToIgnore,
-				ignoreGraytElementsRegex: _editor.config.grayt_elementsToIgnore,
-				minWordLength 		: _editor.config.scayt_minWordLength,
-				multiLanguageMode 	: _editor.config.scayt_multiLanguageMode,
-				multiLanguageStyles	: _editor.config.scayt_multiLanguageStyles,
-				graytAutoStartup	: _editor.config.grayt_autoStartup,
-				charsToObserve		: plugin.charsToObserve
+				userDictionaryName 	: config.scayt_userDictionaryName,
+				localization 		: editor.langCode,
+				customerId 			: config.scayt_customerId,
+				customPunctuation 	: config.scayt_customPunctuation,
+				debug 				: config.scayt_debug,
+				disableOptionsStorage:  config.scayt_disableOptionsStorage,
+				focused 			: editor.editable().hasFocus, // #30260 we need to set focused=true if CKEditor is focused before SCAYT initialization
+				ignoreElementsRegex : config.scayt_elementsToIgnore,
+				ignoreGraytElementsRegex: config.grayt_elementsToIgnore,
+				multiLanguageMode 	: config.scayt_multiLanguageMode,
+				multiLanguageStyles	: config.scayt_multiLanguageStyles,
+				enableGrammar		: config.grayt_autoStartup,//enableGrayt
+				serviceProtocol		: config.scayt_serviceProtocol,
+				serviceHost			: config.scayt_serviceHost,
+				servicePort			: config.scayt_servicePort,
+				servicePath			: config.scayt_servicePath,
+				'ignore-all-caps-words' : config.scayt_ignoreAllCapsWords,
+				'ignore-domain-names' : config.scayt_ignoreDomainNames,
+				'ignore-words-with-mixed-cases': config.scayt_ignoreWordsWithMixedCases,
+				'ignore-words-with-numbers': config.scayt_ignoreWordsWithNumbers,
+				suggestionsCount: config.scayt_maxSuggestions,
+				minWordLength 		: config.scayt_minWordLength,
+				customDictionaryIds : config.scayt_customDictionaryIds,
 			};
 
-			if(_editor.config.scayt_serviceProtocol) {
-				scaytInstanceOptions['service_protocol'] = _editor.config.scayt_serviceProtocol;
+			appInstanceOptions = OptionsManager.createOptions(optionsMap, 'CKEditorAppTemplate', function errorHandler(errors) {
+				errors.reports.forEach(function(report) {
+					if(report.critical) { criticalMessage += report.message + '; '; }
+				}, this);
+			});
+			if(criticalMessage !== '') {
+				throw new Error(criticalMessage)
 			}
-
-			if(_editor.config.scayt_serviceHost) {
-				scaytInstanceOptions['service_host'] = _editor.config.scayt_serviceHost;
-			}
-
-			if(_editor.config.scayt_servicePort) {
-				scaytInstanceOptions['service_port'] = _editor.config.scayt_servicePort;
-			}
-
-			if(_editor.config.scayt_servicePath) {
-				scaytInstanceOptions['service_path'] = _editor.config.scayt_servicePath;
-			}
-
-			//predefined options
-			if(typeof _editor.config.scayt_ignoreAllCapsWords === 'boolean') {
-				scaytInstanceOptions['ignore-all-caps-words'] = _editor.config.scayt_ignoreAllCapsWords;
-			}
-
-			if(typeof _editor.config.scayt_ignoreDomainNames === 'boolean') {
-				scaytInstanceOptions['ignore-domain-names'] = _editor.config.scayt_ignoreDomainNames;
-			}
-
-			if(typeof _editor.config.scayt_ignoreWordsWithMixedCases === 'boolean') {
-				scaytInstanceOptions['ignore-words-with-mixed-cases'] = _editor.config.scayt_ignoreWordsWithMixedCases;
-			}
-
-			if(typeof _editor.config.scayt_ignoreWordsWithNumbers === 'boolean') {
-				scaytInstanceOptions['ignore-words-with-numbers'] = _editor.config.scayt_ignoreWordsWithNumbers;
-			}
+			appInstanceOptions.units = ['common', 'spelling'];
+			config.scayt_maxSuggestions = appInstanceOptions.suggestionsCount;
 
 			function createInstance(options) {
-				return new SCAYT.CKSCAYT(options, function() {
+				return new WEBSPELLCHECKER.CORE.APP(options, function() {
 					// success callback
 				}, function() {
 					// error callback
@@ -1333,13 +1223,12 @@ CKEDITOR.plugins.scayt = {
 
 			// backward compatibility if version of scayt app < 4.8.3
 			try {
-				scaytInstance = createInstance(scaytInstanceOptions);
+				scaytInstance = createInstance(appInstanceOptions);
 			} catch(e) {
 				self.alarmCompatibilityMessage();
-				delete scaytInstanceOptions.charsToObserve;
-				scaytInstance = createInstance(scaytInstanceOptions);
+				scaytInstance = createInstance(appInstanceOptions);
 			}
-
+			Object.assign( self.options, scaytInstance.getAttributeInfo() ) ;
 			scaytInstance.subscribe('suggestionListSend', function(data) {
 				// TODO: 1. Maybe store suggestions for specific editor
 				// TODO: 2. Fix issue with suggestion duplicates on on server
@@ -1370,23 +1259,33 @@ CKEDITOR.plugins.scayt = {
 				plugin.state.grayt[_editor.name] = data.state;
 			});
 
-			// backward compatibility if version of scayt app < 4.8.3
-			if(scaytInstance.addMarkupHandler) {
-				scaytInstance.addMarkupHandler(function(data){
-					/*
-					 	CKEDITOR use cke-fillingChar with code "8203" for system processes
-					 	If SCAYT have changed DOM content we will use the method "setCustomData"
-					 	for providing a link to the new node with special character cke-fillingChar
-					 	for this case
-					*/
-					var editable = _editor.editable(),
-						customData = editable.getCustomData(data.charName);
-					if(customData){
-						customData.$ = data.node;
-						editable.setCustomData(data.charName, customData);
+			function checkNodeWithSpecialChars(data) {
+				var chars = plugin.charsToObserve,
+				nodeWithChar,
+				node = data.node,
+				charName;
+
+				for(var i = 0; i < chars.length; i+=1) {
+					nodeWithChar = scaytInstance.findNodeWithChar(node, chars[i]);
+					charName = chars[i].charName;
+					if(nodeWithChar) {
+						/*
+							CKEDITOR use cke-fillingChar with code "8203" for system processes
+							If SCAYT have changed DOM content we will use the method "setCustomData"
+							for providing a link to the new node with special character cke-fillingChar
+							for this case
+						*/
+						var editable = _editor.editable(),
+							customData = editable.getCustomData(charName);
+						if(customData){
+							customData.$ = nodeWithChar;
+							editable.setCustomData(charName, customData);
+						}
 					}
-				});
+				}
 			}
+			scaytInstance.subscribe('removedMarkupInContainer', checkNodeWithSpecialChars);
+			scaytInstance.subscribe('markupedNode', checkNodeWithSpecialChars);
 
 			_editor.scayt = scaytInstance;
 
