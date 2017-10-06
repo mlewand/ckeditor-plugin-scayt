@@ -1182,7 +1182,7 @@ CKEDITOR.plugins.scayt = {
 				disableOptionsStorage:  config.scayt_disableOptionsStorage,
 				focused 			: editor.editable().hasFocus, // #30260 we need to set focused=true if CKEditor is focused before SCAYT initialization
 				ignoreElementsRegex : config.scayt_elementsToIgnore,
-				ignoreGraytElementsRegex: config.grayt_elementsToIgnore,
+				ignoreGrammarElements : config.grayt_elementsToIgnore,
 				multiLanguageMode 	: config.scayt_multiLanguageMode,
 				multiLanguageStyles	: config.scayt_multiLanguageStyles,
 				enableGrammar		: config.grayt_autoStartup,//enableGrayt
@@ -1196,7 +1196,7 @@ CKEDITOR.plugins.scayt = {
 				'ignore-words-with-numbers': config.scayt_ignoreWordsWithNumbers,
 				suggestionsCount: config.scayt_maxSuggestions,
 				minWordLength 		: config.scayt_minWordLength,
-				customDictionaryIds : config.scayt_customDictionaryIds,
+				customDictionaryIds : config.scayt_customDictionaryIds
 			};
 
 			appInstanceOptions = OptionsManager.createOptions(optionsMap, 'CKEditorAppTemplate', function errorHandler(errors) {
@@ -1207,7 +1207,7 @@ CKEDITOR.plugins.scayt = {
 			if(criticalMessage !== '') {
 				throw new Error(criticalMessage)
 			}
-			appInstanceOptions.units = ['common', 'spelling'];
+			appInstanceOptions.units = ['spelling', 'grammar'];
 			config.scayt_maxSuggestions = appInstanceOptions.suggestionsCount;
 
 			function createInstance(options) {
@@ -1255,7 +1255,7 @@ CKEDITOR.plugins.scayt = {
 				}
 			});
 
-			scaytInstance.subscribe('graytStateChanged', function(data) {
+			scaytInstance.subscribe('enableGrammarChanged', function(data) {
 				plugin.state.grayt[_editor.name] = data.state;
 			});
 
