@@ -619,7 +619,6 @@ CKEDITOR.plugins.add('scayt', {
 				config[itemName] = item.defaultValue;
 			}
 		}
-
 		/* checking 'undo' plugin, if no disable SCAYT handler */
 		config.scayt_handleUndoRedo = CKEDITOR.plugins.undo ? config.scayt_handleUndoRedo : false;
 
@@ -950,7 +949,7 @@ CKEDITOR.plugins.add('scayt', {
 			itemList = {},
 			allowedOption = editor.config.scayt_contextCommands.split('|'),
 			lang = selectionNode.getAttribute(scaytInstance.getLangAttribute()) || scaytInstance.getLang(),
-			word, grammarPhrase, isScaytNode, isGrammarNode, problemDescriptionText;
+			word, phrase, rule, isScaytNode, isGrammarNode, problemDescriptionText;
 
 
 		isScaytNode = scaytInstance.isScaytNode(selectionNode);
@@ -973,17 +972,19 @@ CKEDITOR.plugins.add('scayt', {
 			// we clicked grammar problem
 			// get suggestions
 			menuItems = menuItems.grayt;
-			grammarPhrase = selectionNode.getAttribute(scaytInstance.getGraytNodeAttributeName());
+			phrase = selectionNode.getAttribute(scaytInstance.getGraytNodeAttributeName());
+			rule = selectionNode.getAttribute(scaytInstance.getGraytNodeRuleAttributeName());
 
 			// setup grammar problem description
-			problemDescriptionText = scaytInstance.getProblemDescriptionText(grammarPhrase, lang);
+			problemDescriptionText = scaytInstance.getProblemDescriptionText(phrase, rule, lang);
 			if(menuItems.grayt_problemdescription && problemDescriptionText) {
 				menuItems.grayt_problemdescription.label = problemDescriptionText;
 			}
 
 			scaytInstance.fire('getGrammarSuggestionsList', {
 				lang: lang,
-				phrase: grammarPhrase
+				phrase: phrase,
+				rule: rule
 			});
 
 			itemList = this.buildSuggestionMenuItems(editor, CKEDITOR.plugins.scayt.suggestions, isScaytNode);
@@ -1210,86 +1211,73 @@ CKEDITOR.plugins.scayt = {
 			appInstanceOptions.units = ['spelling', 'grammar'];
 			config.scayt_maxSuggestions = appInstanceOptions.suggestionsCount;
 
-			function createInstance(options) {
-				return new WEBSPELLCHECKER.CORE.APP(options, function() {
-					// success callback
-				}, function() {
-					// error callback
-				});
-			}
-
 			var scaytInstance,
 				wordsPrefix = 'word_';
 
-			// backward compatibility if version of scayt app < 4.8.3
-			try {
-				scaytInstance = createInstance(appInstanceOptions);
-			} catch(e) {
-				self.alarmCompatibilityMessage();
-				scaytInstance = createInstance(appInstanceOptions);
-			}
-			Object.assign( self.options, scaytInstance.getAttributeInfo() ) ;
-			scaytInstance.subscribe('suggestionListSend', function(data) {
-				// TODO: 1. Maybe store suggestions for specific editor
-				// TODO: 2. Fix issue with suggestion duplicates on on server
-				//CKEDITOR.plugins.scayt.suggestions = data.suggestionList;
-				var _wordsCollection = {},
-					_suggestionList =[];
+			WEBSPELLCHECKER.CORE.createApp(appInstanceOptions, function(appInstance) {
+				Object.assign( self.options, appInstance.getAttributeInfo() ) ;
+				appInstance.subscribe('suggestionListSend', function(data) {
+					// TODO: 1. Maybe store suggestions for specific editor
+					// TODO: 2. Fix issue with suggestion duplicates on on server
+					//CKEDITOR.plugins.scayt.suggestions = data.suggestionList;
+					var _wordsCollection = {},
+						_suggestionList =[];
 
-				for (var i = 0; i < data.suggestionList.length; i++) {
-					if (!_wordsCollection[wordsPrefix + data.suggestionList[i]]) {
-						_wordsCollection[wordsPrefix + data.suggestionList[i]] = data.suggestionList[i];
-						_suggestionList.push(data.suggestionList[i]);
+					for (var i = 0; i < data.suggestionList.length; i++) {
+						if (!_wordsCollection[wordsPrefix + data.suggestionList[i]]) {
+							_wordsCollection[wordsPrefix + data.suggestionList[i]] = data.suggestionList[i];
+							_suggestionList.push(data.suggestionList[i]);
+						}
 					}
-				}
 
-				CKEDITOR.plugins.scayt.suggestions = _suggestionList;
-			});
+					CKEDITOR.plugins.scayt.suggestions = _suggestionList;
+				});
 
-			// if selection has changed programmatically by SCAYT we need to react appropriately
-			scaytInstance.subscribe('selectionIsChanged', function(data) {
-				var selection = _editor.getSelection();
+				// if selection has changed programmatically by SCAYT we need to react appropriately
+				appInstance.subscribe('selectionIsChanged', function(data) {
+					var selection = _editor.getSelection();
 
-				if(selection.isLocked) {
-					_editor.lockSelection();
-				}
-			});
+					if(selection.isLocked) {
+						_editor.lockSelection();
+					}
+				});
 
-			scaytInstance.subscribe('enableGrammarChanged', function(data) {
-				plugin.state.grayt[_editor.name] = data.state;
-			});
+				appInstance.subscribe('enableGrammarChanged', function(data) {
+					plugin.state.grayt[_editor.name] = data.state;
+				});
 
-			function checkNodeWithSpecialChars(data) {
-				var chars = plugin.charsToObserve,
-				nodeWithChar,
-				node = data.node,
-				charName;
+				function checkNodeWithSpecialChars(data) {
+					var chars = plugin.charsToObserve,
+					nodeWithChar,
+					node = data.node,
+					charName;
 
-				for(var i = 0; i < chars.length; i+=1) {
-					nodeWithChar = scaytInstance.findNodeWithChar(node, chars[i]);
-					charName = chars[i].charName;
-					if(nodeWithChar) {
-						/*
-							CKEDITOR use cke-fillingChar with code "8203" for system processes
-							If SCAYT have changed DOM content we will use the method "setCustomData"
-							for providing a link to the new node with special character cke-fillingChar
-							for this case
-						*/
-						var editable = _editor.editable(),
-							customData = editable.getCustomData(charName);
-						if(customData){
-							customData.$ = nodeWithChar;
-							editable.setCustomData(charName, customData);
+					for(var i = 0; i < chars.length; i+=1) {
+						nodeWithChar = appInstance.findNodeWithChar(node, chars[i]);
+						charName = chars[i].charName;
+						if(nodeWithChar) {
+							/*
+								CKEDITOR use cke-fillingChar with code "8203" for system processes
+								If SCAYT have changed DOM content we will use the method "setCustomData"
+								for providing a link to the new node with special character cke-fillingChar
+								for this case
+							*/
+							var editable = _editor.editable(),
+								customData = editable.getCustomData(charName);
+							if(customData){
+								customData.$ = nodeWithChar;
+								editable.setCustomData(charName, customData);
+							}
 						}
 					}
 				}
-			}
-			scaytInstance.subscribe('removedMarkupInContainer', checkNodeWithSpecialChars);
-			scaytInstance.subscribe('markupedNode', checkNodeWithSpecialChars);
+				appInstance.subscribe('removedMarkupInContainer', checkNodeWithSpecialChars);
+				appInstance.subscribe('markupedNode', checkNodeWithSpecialChars);
 
-			_editor.scayt = scaytInstance;
+				_editor.scayt = appInstance;
 
-			_editor.fire('scaytButtonState', _editor.readOnly ? CKEDITOR.TRISTATE_DISABLED : CKEDITOR.TRISTATE_ON);
+				_editor.fire('scaytButtonState', _editor.readOnly ? CKEDITOR.TRISTATE_DISABLED : CKEDITOR.TRISTATE_ON);
+			});
 		});
 	},
 	destroy: function(editor) {
